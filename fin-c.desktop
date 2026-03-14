@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=fin-c
+Comment=Calculator
+Exec=/usr/bin/fin-c
+Icon=system-search
+Type=Application
+Terminal=false
+Categories=Utility;
