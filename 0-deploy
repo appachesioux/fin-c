@@ -11,4 +11,9 @@ echo
 echo "[#######] TO /usr/bin";
 sudo cp zig-out/bin/fin-c /usr/bin/;
 
+echo
+echo "[#######] Icon + Desktop";
+sudo cp fin-c.svg /usr/share/icons/hicolor/scalable/apps/fin-c.svg;
+sudo cp fin-c.desktop /usr/share/applications/fin-c.desktop;
+
 echo "[#######] END --------------------------------------------------------------------";

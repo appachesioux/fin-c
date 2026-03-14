@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a3a2a"/>
+      <stop offset="100%" stop-color="#0d2818"/>
+    </linearGradient>
+    <linearGradient id="tape" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f5f5f0"/>
+      <stop offset="100%" stop-color="#e8e4d8"/>
+    </linearGradient>
+  </defs>
+  <!-- Paper tape coming out the top -->
+  <path d="M72 4 Q72 0 76 0 L92 0 Q96 0 96 4 L96 34 Q96 38 92 38 L76 38 Q72 38 72 34Z" fill="url(#tape)" opacity="0.9"/>
+  <!-- Tape lines (printed numbers) -->
+  <line x1="76" y1="8" x2="92" y2="8" stroke="#6c7086" stroke-width="1" opacity="0.6"/>
+  <line x1="76" y1="14" x2="90" y2="14" stroke="#6c7086" stroke-width="1" opacity="0.6"/>
+  <line x1="76" y1="20" x2="88" y2="20" stroke="#6c7086" stroke-width="1" opacity="0.6"/>
+  <line x1="76" y1="26" x2="92" y2="26" stroke="#f38ba8" stroke-width="1.5" opacity="0.8"/>
+  <!-- Tape curl -->
+  <path d="M72 34 Q68 38 70 42 Q72 46 76 44" fill="none" stroke="#d8d4c8" stroke-width="2" opacity="0.5"/>
+  <!-- Calculator body -->
+  <rect x="16" y="32" width="80" height="80" rx="10" fill="#45475a" stroke="#585b70" stroke-width="1.5"/>
+  <!-- Display screen -->
+  <rect x="22" y="38" width="68" height="22" rx="4" fill="url(#screen)" stroke="#2a4a38" stroke-width="1"/>
+  <!-- Display text -->
+  <text x="84" y="54" font-family="monospace" font-size="14" fill="#a6e3a1" text-anchor="end" font-weight="bold">1,250.00</text>
+  <!-- Button rows -->
+  <!-- Row 1: C CE % / -->
+  <rect x="24" y="66" width="14" height="10" rx="2" fill="#f38ba8" opacity="0.85"/>
+  <rect x="41" y="66" width="14" height="10" rx="2" fill="#f9e2af" opacity="0.85"/>
+  <rect x="58" y="66" width="14" height="10" rx="2" fill="#89b4fa" opacity="0.85"/>
+  <rect x="75" y="66" width="14" height="10" rx="2" fill="#fab387" opacity="0.85"/>
+  <!-- Row 2 -->
+  <rect x="24" y="79" width="14" height="10" rx="2" fill="#585b70"/>
+  <rect x="41" y="79" width="14" height="10" rx="2" fill="#585b70"/>
+  <rect x="58" y="79" width="14" height="10" rx="2" fill="#585b70"/>
+  <rect x="75" y="79" width="14" height="10" rx="2" fill="#fab387" opacity="0.85"/>
+  <!-- Row 3 -->
+  <rect x="24" y="92" width="14" height="10" rx="2" fill="#585b70"/>
+  <rect x="41" y="92" width="14" height="10" rx="2" fill="#585b70"/>
+  <rect x="58" y="92" width="14" height="10" rx="2" fill="#585b70"/>
+  <rect x="75" y="92" width="14" height="10" rx="2" fill="#a6e3a1" opacity="0.85"/>
+</svg>

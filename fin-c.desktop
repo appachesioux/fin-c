@@ -2,7 +2,7 @@
 Name=fin-c
 Comment=Calculator
 Exec=/usr/bin/fin-c
-Icon=system-search
+Icon=fin-c
 Type=Application
 Terminal=false
 Categories=Utility;
