@@ -2,6 +2,7 @@ const std = @import("std");
 const rl = @cImport({
     @cInclude("raylib.h");
 });
+const build_options = @import("build_options");
 
 const number = @import("number.zig");
 const tape = @import("tape.zig");
@@ -45,7 +46,7 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     rl.SetConfigFlags(rl.FLAG_WINDOW_RESIZABLE);
-    rl.InitWindow(WINDOW_W, WINDOW_H, "fin-c");
+    rl.InitWindow(WINDOW_W, WINDOW_H, build_options.app_name ++ " v" ++ build_options.version);
     defer rl.CloseWindow();
     rl.SetTargetFPS(60);
 

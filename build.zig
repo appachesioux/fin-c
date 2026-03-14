@@ -1,4 +1,5 @@
 const std = @import("std");
+const zon = @import("build.zig.zon");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -10,12 +11,19 @@ pub fn build(b: *std.Build) void {
     });
     const raylib_artifact = raylib_dep.artifact("raylib");
 
+    const options = b.addOptions();
+    options.addOption([]const u8, "version", zon.version);
+    options.addOption([]const u8, "app_name", "fin-c");
+
     const exe = b.addExecutable(.{
         .name = "fin-c",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
+            .imports = &.{
+                .{ .name = "build_options", .module = options.createModule() },
+            },
         }),
     });
 
