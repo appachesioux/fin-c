@@ -2,11 +2,18 @@
 
 Calculadora financeira com visual de bobina de papel, feita em Zig + raylib.
 
+Written with assistance from Claude Code
+
 ## Build e execução
 
 ```sh
 zig build run
 ```
+```sh
+rm -rvf zig-out;
+zig build -Doptimize=ReleaseSmall;
+```
+
 
 Requer Zig 0.15.2. Raylib é compilado automaticamente como dependência (não precisa instalar no sistema).
 
