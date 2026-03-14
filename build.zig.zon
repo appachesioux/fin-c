@@ -1,6 +1,6 @@
 .{
     .fingerprint = 0x39633a9e7db4f371,
-    .name = .calc_f,
+    .name = .fin_c,
     .version = "0.1.0",
     .dependencies = .{
         .raylib_zig = .{
