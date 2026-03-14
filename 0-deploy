@@ -1,0 +1,14 @@
+#!/bin/bash
+
+clear;
+echo "[#######] INI --------------------------------------------------------------------";
+
+pwd;
+rm -rvf zig-out;
+zig build -Doptimize=ReleaseSmall;
+
+echo
+echo "[#######] TO /usr/bin";
+sudo cp zig-out/bin/fin-c /usr/bin/;
+
+echo "[#######] END --------------------------------------------------------------------";
