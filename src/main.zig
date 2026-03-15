@@ -46,7 +46,7 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     rl.SetConfigFlags(rl.FLAG_WINDOW_RESIZABLE);
-    rl.InitWindow(WINDOW_W, WINDOW_H, build_options.app_name ++ " v" ++ build_options.version);
+    rl.InitWindow(WINDOW_W, WINDOW_H, build_options.app_name ++ "  v" ++ build_options.version);
     defer rl.CloseWindow();
     rl.SetTargetFPS(60);
 

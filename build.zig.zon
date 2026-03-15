@@ -1,7 +1,7 @@
 .{
-    .fingerprint = 0x39633a9e7db4f371,
+    .fingerprint = 0x3daf5a2a9ff22e2d,
     .name = .fin_c,
-    .version = "0.1.0",
+    .version = "0.1.1",
     .dependencies = .{
         .raylib_zig = .{
             .url = "git+https://github.com/raylib-zig/raylib-zig?ref=devel#cd71c85d571027ac8033357f83b124ee051825b3",
