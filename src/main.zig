@@ -42,6 +42,7 @@ const KB_PAD: f32 = 8;
 const INPUT_H: f32 = 40;
 
 const font_data = @embedFile("JetBrainsMono-Regular.ttf");
+const icon_data = @embedFile("icon.png");
 var font: rl.Font = undefined;
 
 // Button press feedback
@@ -58,6 +59,12 @@ pub fn main() !void {
     rl.SetConfigFlags(rl.FLAG_WINDOW_RESIZABLE);
     rl.InitWindow(WINDOW_W, WINDOW_H, build_options.app_name ++ "  v" ++ build_options.version);
     defer rl.CloseWindow();
+
+    // Window icon
+    const icon = rl.LoadImageFromMemory(".png", icon_data, @intCast(icon_data.len));
+    rl.SetWindowIcon(icon);
+    rl.UnloadImage(icon);
+
     rl.SetTargetFPS(60);
 
     // Load font at large size for quality scaling

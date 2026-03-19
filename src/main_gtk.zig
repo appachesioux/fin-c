@@ -55,6 +55,8 @@ fn onActivate(app: *gtk.GtkApplication, _: gtk.gpointer) callconv(.c) void {
     gtk.gtk_window_set_title(@ptrCast(window), build_options.app_name ++ "  v" ++ build_options.version);
     gtk.gtk_window_set_default_size(@ptrCast(window), 420, 900);
 
+    gtk.gtk_window_set_icon_name(@ptrCast(window), "fin-c");
+
     // CSS styling
     loadCss();
 
