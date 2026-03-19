@@ -45,7 +45,7 @@ jobs:
 
   # ── macOS (Apple Silicon + cross-compile x86_64 raylib) ───
   build-macos:
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: mlugg/setup-zig@v2
