@@ -94,12 +94,12 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
 
-      - name: Create symlinks for Zig compatibility
+      - name: Copy import libs for Zig compatibility
         run: |
           cd /ucrt64/lib
           for f in *.dll.a; do
             base="${f%.dll.a}"
-            [ ! -e "${base}.a" ] && ln -s "$f" "${base}.a"
+            [ ! -e "${base}.a" ] && cp "$f" "${base}.a" || true
           done
       - name: Build GTK (Windows x86_64)
         run: zig build -Doptimize=ReleaseSmall --search-prefix /ucrt64
