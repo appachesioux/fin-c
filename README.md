@@ -1,6 +1,12 @@
 # fin-c
 
-Calculadora financeira com visual de bobina de papel, feita em Zig. Dois frontends: GTK 4 (principal) e raylib.
+Calculadora financeira com visual de bobina de papel, feita em Zig. Dois frontends: GTK 4 (Linux/macOS) e raylib (Linux/macOS/Windows).
+
+<p align="center">
+  <img src="screenshots/gtk4.png" width="280" alt="fin-c GTK4">&nbsp;&nbsp;&nbsp;
+  <img src="screenshots/raylib.png" width="280" alt="fin-c raylib">
+</p>
+<p align="center"><em>GTK 4 (esquerda) &nbsp;|&nbsp; raylib (direita)</em></p>
 
 Written with assistance from Claude Code
 
@@ -45,8 +51,8 @@ Requer Zig 0.15.2.
 
 ### Implementado
 - Dois frontends: GTK 4 (principal, `-Dgui=gtk`) e raylib (padrão)
-- Janela redimensionável (420x700 padrão)
-- Visor de bobina de papel branco com 3/4 da altura, scroll via mouse wheel
+- Janela redimensionável (420x900 padrão)
+- Visor de bobina de papel maximizado (teclado compacto), scroll via mouse wheel
 - Teclado virtual clicável (CE, C, backspace, %, dígitos, operadores, =, +/-, FIN, DP+/DP-)
 - Teclado físico (numpad + teclas comuns)
 - Aritmética com i128 fixed-point (casas decimais configuráveis 0-8, padrão 2)
