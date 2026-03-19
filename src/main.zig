@@ -11,13 +11,15 @@ const keyboard = @import("keyboard.zig");
 
 // Layout
 const WINDOW_W = 420;
-const WINDOW_H = 700;
+const WINDOW_H = 900;
+const KB_ROWS: f32 = @floatFromInt(keyboard.ROWS);
 
-// Colors
+// Colors — matched to GTK4 theme
 const COLOR_BG = rl.Color{ .r = 60, .g = 60, .b = 65, .a = 255 };
-const COLOR_TAPE = rl.Color{ .r = 255, .g = 255, .b = 250, .a = 255 };
+const COLOR_TAPE = rl.Color{ .r = 255, .g = 251, .b = 250, .a = 255 };
 const COLOR_TAPE_TEXT = rl.Color{ .r = 30, .g = 30, .b = 30, .a = 255 };
-const COLOR_TAPE_OP = rl.Color{ .r = 120, .g = 120, .b = 130, .a = 255 };
+const COLOR_TAPE_RESULT = rl.Color{ .r = 10, .g = 10, .b = 10, .a = 255 };
+const COLOR_TAPE_OP = rl.Color{ .r = 120, .g = 120, .b = 126, .a = 255 };
 const COLOR_INPUT_BG = rl.Color{ .r = 45, .g = 45, .b = 50, .a = 255 };
 const COLOR_INPUT_TEXT = rl.Color{ .r = 220, .g = 255, .b = 220, .a = 255 };
 const COLOR_BTN = rl.Color{ .r = 85, .g = 85, .b = 90, .a = 255 };
@@ -27,9 +29,17 @@ const COLOR_BTN_TEXT = rl.Color{ .r = 240, .g = 240, .b = 240, .a = 255 };
 const COLOR_BTN_CLEAR = rl.Color{ .r = 160, .g = 60, .b = 60, .a = 255 };
 const COLOR_BTN_FN = rl.Color{ .r = 70, .g = 100, .b = 140, .a = 255 };
 
-const FONT_SIZE: f32 = 22;
+// Font sizes — tape/input larger, buttons compact
+const TAPE_FONT: f32 = 20;
+const INPUT_FONT: f32 = 22;
+const BTN_FONT: f32 = 16;
 const LINE_HEIGHT: f32 = 28;
 const TAPE_MARGIN: f32 = 16;
+
+// Keyboard height: compact fixed size based on button minimum
+const BTN_MIN_H: f32 = 34;
+const KB_PAD: f32 = 8;
+const INPUT_H: f32 = 40;
 
 const font_data = @embedFile("JetBrainsMono-Regular.ttf");
 var font: rl.Font = undefined;
@@ -50,7 +60,8 @@ pub fn main() !void {
     defer rl.CloseWindow();
     rl.SetTargetFPS(60);
 
-    const font_size_int: c_int = @intFromFloat(FONT_SIZE * 2);
+    // Load font at large size for quality scaling
+    const font_size_int: c_int = @intFromFloat(INPUT_FONT * 2);
     font = rl.LoadFontFromMemory(".ttf", font_data, @intCast(font_data.len), font_size_int, null, 0);
     rl.SetTextureFilter(font.texture, rl.TEXTURE_FILTER_BILINEAR);
     defer rl.UnloadFont(font);
@@ -68,9 +79,10 @@ pub fn main() !void {
     while (!rl.WindowShouldClose()) {
         const win_w: f32 = @floatFromInt(rl.GetScreenWidth());
         const win_h: f32 = @floatFromInt(rl.GetScreenHeight());
-        const kb_h = win_h / 4.0;
-        const input_h: f32 = 40.0;
-        const tape_h = win_h - kb_h - input_h;
+
+        // Keyboard takes only what it needs — rest goes to tape
+        const kb_h = BTN_MIN_H * KB_ROWS + KB_PAD;
+        const tape_h = win_h - kb_h - INPUT_H;
 
         // Scroll
         const wheel = rl.GetMouseWheelMove();
@@ -129,8 +141,8 @@ pub fn main() !void {
         rl.ClearBackground(COLOR_BG);
 
         drawTapeArea(0, 0, win_w, tape_h, &t);
-        drawInputLine(0, tape_h, win_w, input_h, input_buf[0..input_len]);
-        drawKeyboard(0, tape_h + input_h, win_w, kb_h, &kb);
+        drawInputLine(0, tape_h, win_w, INPUT_H, input_buf[0..input_len]);
+        drawKeyboard(0, tape_h + INPUT_H, win_w, kb_h, &kb);
 
         rl.EndDrawing();
     }
@@ -139,7 +151,8 @@ pub fn main() !void {
 // ── Rendering ──────────────────────────────────────────────
 
 fn drawTapeArea(x: f32, y: f32, w: f32, h: f32, t: *tape.Tape) void {
-    rl.DrawRectangleRec(.{ .x = x + 8, .y = y + 8, .width = w - 16, .height = h - 8 }, COLOR_TAPE);
+    // Tape paper background with rounded top corners
+    rl.DrawRectangleRounded(.{ .x = x + 8, .y = y + 8, .width = w - 16, .height = h - 8 }, 0.02, 4, COLOR_TAPE);
 
     rl.BeginScissorMode(
         @intFromFloat(x + 8),
@@ -175,20 +188,21 @@ fn drawTapeArea(x: f32, y: f32, w: f32, h: f32, t: *tape.Tape) void {
                 .equals => "=",
             } else " ";
 
-            const tag_width = measureText(tag_str, FONT_SIZE);
-            const val_width = measureText(toC(val_str), FONT_SIZE);
+            const tag_width = measureText(tag_str, TAPE_FONT);
+            const val_width = measureText(toC(val_str), TAPE_FONT);
             const op_right_x = x + w - TAPE_MARGIN - 16;
             const val_x = op_right_x - tag_width - 8 - val_width;
 
-            const color = if (entry.is_result) COLOR_TAPE_TEXT else COLOR_TAPE_TEXT;
+            // Results rendered bolder (darker color)
+            const val_color = if (entry.is_result) COLOR_TAPE_RESULT else COLOR_TAPE_TEXT;
 
-            drawText(toC(val_str), val_x, draw_y, FONT_SIZE, color);
-            drawText(tag_str, op_right_x - tag_width, draw_y, FONT_SIZE, COLOR_TAPE_OP);
+            drawText(toC(val_str), val_x, draw_y, TAPE_FONT, val_color);
+            drawText(tag_str, op_right_x - tag_width, draw_y, TAPE_FONT, COLOR_TAPE_OP);
 
             if (entry.is_result) {
                 rl.DrawLineEx(
-                    .{ .x = x + TAPE_MARGIN + 8, .y = draw_y + FONT_SIZE + 2 },
-                    .{ .x = x + w - TAPE_MARGIN - 16, .y = draw_y + FONT_SIZE + 2 },
+                    .{ .x = x + TAPE_MARGIN + 8, .y = draw_y + TAPE_FONT + 2 },
+                    .{ .x = x + w - TAPE_MARGIN - 16, .y = draw_y + TAPE_FONT + 2 },
                     1.0,
                     COLOR_TAPE_TEXT,
                 );
@@ -207,7 +221,7 @@ fn drawTapeArea(x: f32, y: f32, w: f32, h: f32, t: *tape.Tape) void {
         @intFromFloat(w - 16),
         20,
         rl.Color{ .r = 200, .g = 200, .b = 195, .a = 100 },
-        rl.Color{ .r = 255, .g = 255, .b = 250, .a = 0 },
+        rl.Color{ .r = 255, .g = 251, .b = 250, .a = 0 },
     );
 }
 
@@ -215,19 +229,18 @@ fn drawInputLine(x: f32, y: f32, w: f32, h: f32, text: []const u8) void {
     rl.DrawRectangleRec(.{ .x = x + 8, .y = y, .width = w - 16, .height = h }, COLOR_INPUT_BG);
 
     if (text.len > 0) {
-        const tw = measureText(toC(text), FONT_SIZE);
+        const tw = measureText(toC(text), INPUT_FONT);
         const tx = x + w - TAPE_MARGIN - 24 - tw;
-        drawText(toC(text), tx, y + (h - FONT_SIZE) / 2, FONT_SIZE, COLOR_INPUT_TEXT);
+        drawText(toC(text), tx, y + (h - INPUT_FONT) / 2, INPUT_FONT, COLOR_INPUT_TEXT);
     } else {
-        const tw = measureText("0", FONT_SIZE);
+        const tw = measureText("0", INPUT_FONT);
         const tx = x + w - TAPE_MARGIN - 24 - tw;
-        drawText("0", tx, y + (h - FONT_SIZE) / 2, FONT_SIZE, rl.Color{ .r = 120, .g = 160, .b = 120, .a = 255 });
+        drawText("0", tx, y + (h - INPUT_FONT) / 2, INPUT_FONT, rl.Color{ .r = 120, .g = 160, .b = 120, .a = 255 });
     }
 }
 
 fn drawKeyboard(x: f32, y: f32, w: f32, h: f32, kb: *const keyboard.Keyboard) void {
-    const rows: f32 = @floatFromInt(keyboard.ROWS);
-    const btn_h = (h - 8) / rows;
+    const btn_h = (h - KB_PAD) / KB_ROWS;
     const mouse = rl.GetMousePosition();
     const pressed = rl.IsMouseButtonDown(rl.MOUSE_BUTTON_LEFT);
 
@@ -238,9 +251,9 @@ fn drawKeyboard(x: f32, y: f32, w: f32, h: f32, kb: *const keyboard.Keyboard) vo
         for (0..keyboard.COLS) |ci| {
             const btn = kb.getBtn(ri, ci);
             const bx = x + 8 + @as(f32, @floatFromInt(ci)) * btn_w + 2;
-            const by = y + 4 + @as(f32, @floatFromInt(ri)) * btn_h + 2;
+            const by = y + 4 + @as(f32, @floatFromInt(ri)) * btn_h + 1;
             const bw = btn_w - 4;
-            const bh = btn_h - 4;
+            const bh = btn_h - 2;
 
             const rect = rl.Rectangle{ .x = bx, .y = by, .width = bw, .height = bh };
             const hovered = rl.CheckCollisionPointRec(mouse, rect);
@@ -252,10 +265,10 @@ fn drawKeyboard(x: f32, y: f32, w: f32, h: f32, kb: *const keyboard.Keyboard) vo
             rl.DrawRectangleRounded(rect, 0.2, 4, color);
 
             const label = btn.label;
-            const tw = measureText(toC(label), FONT_SIZE);
+            const tw = measureText(toC(label), BTN_FONT);
             const tx = bx + (bw - tw) / 2;
-            const ty = by + (bh - FONT_SIZE) / 2;
-            drawText(toC(label), tx, ty, FONT_SIZE, COLOR_BTN_TEXT);
+            const ty = by + (bh - BTN_FONT) / 2;
+            drawText(toC(label), tx, ty, BTN_FONT, COLOR_BTN_TEXT);
         }
     }
 }
