@@ -93,7 +93,7 @@ jobs:
           version: ${{ env.ZIG_VERSION }}
 
       - name: Build GTK (Windows x86_64)
-        run: zig build -Doptimize=ReleaseSmall
+        run: zig build -Doptimize=ReleaseSmall --search-prefix /ucrt64
       - name: Package GTK Windows
         run: |
           mkdir -p dist
