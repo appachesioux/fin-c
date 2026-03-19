@@ -30,9 +30,6 @@ pub fn build(b: *std.Build) void {
 
     if (use_gtk) {
         exe.linkSystemLibrary("gtk4");
-        if (target.result.os.tag == .windows) {
-            exe.use_lld = false;
-        }
     } else {
         const raylib_dep = b.dependency("raylib_zig", .{
             .target = target,
