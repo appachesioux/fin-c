@@ -43,38 +43,9 @@ jobs:
           name: linux-builds
           path: dist/
 
-  # ── macOS x86_64: GTK + raylib ────────────────────────────
-  build-macos-x86:
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v4
-      - uses: mlugg/setup-zig@v2
-        with:
-          version: ${{ env.ZIG_VERSION }}
-
-      - name: Install GTK 4
-        run: brew install gtk4
-
-      - name: Build GTK (macOS x86_64)
-        run: zig build -Doptimize=ReleaseSmall
-      - name: Package
-        run: |
-          mkdir -p dist
-          cp zig-out/bin/fin-c dist/fin-c-gtk-macos-x86_64
-
-      - name: Build raylib (macOS x86_64)
-        run: zig build -Dgui=raylib -Doptimize=ReleaseSmall
-      - name: Package raylib
-        run: cp zig-out/bin/fin-c dist/fin-c-raylib-macos-x86_64
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-x86-builds
-          path: dist/
-
-  # ── macOS ARM (Apple Silicon): GTK + raylib ───────────────
-  build-macos-arm:
-    runs-on: macos-14
+  # ── macOS (Apple Silicon + cross-compile x86_64 raylib) ───
+  build-macos:
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: mlugg/setup-zig@v2
@@ -93,18 +64,23 @@ jobs:
 
       - name: Build raylib (macOS ARM)
         run: zig build -Dgui=raylib -Doptimize=ReleaseSmall
-      - name: Package raylib
+      - name: Package raylib ARM
         run: cp zig-out/bin/fin-c dist/fin-c-raylib-macos-arm64
+
+      - name: Cross-compile raylib (macOS x86_64)
+        run: zig build -Dgui=raylib -Doptimize=ReleaseSmall -Dtarget=x86_64-macos
+      - name: Package raylib x86_64
+        run: cp zig-out/bin/fin-c dist/fin-c-raylib-macos-x86_64
 
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-arm-builds
+          name: macos-builds
           path: dist/
 
   # ── Release ───────────────────────────────────────────────
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-linux, build-macos-x86, build-macos-arm]
+    needs: [build-linux, build-macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
