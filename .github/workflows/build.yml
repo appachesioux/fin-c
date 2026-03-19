@@ -86,21 +86,13 @@ jobs:
           install: >-
             mingw-w64-ucrt-x86_64-gtk4
             mingw-w64-ucrt-x86_64-pkg-config
-            mingw-w64-ucrt-x86_64-vulkan-loader
-            mingw-w64-ucrt-x86_64-graphene
+            mingw-w64-ucrt-x86_64-gcc
           path-type: inherit
       - uses: actions/checkout@v4
       - uses: mlugg/setup-zig@v2
         with:
           version: ${{ env.ZIG_VERSION }}
 
-      - name: Copy import libs for Zig compatibility
-        run: |
-          cd /ucrt64/lib
-          for f in *.dll.a; do
-            base="${f%.dll.a}"
-            [ ! -e "${base}.a" ] && cp "$f" "${base}.a" || true
-          done
       - name: Build GTK (Windows x86_64)
         run: zig build -Doptimize=ReleaseSmall --search-prefix /ucrt64
       - name: Package GTK Windows
