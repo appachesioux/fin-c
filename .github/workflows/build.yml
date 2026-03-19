@@ -86,6 +86,8 @@ jobs:
           install: >-
             mingw-w64-ucrt-x86_64-gtk4
             mingw-w64-ucrt-x86_64-pkg-config
+            mingw-w64-ucrt-x86_64-vulkan-loader
+            mingw-w64-ucrt-x86_64-graphene
           path-type: inherit
       - uses: actions/checkout@v4
       - uses: mlugg/setup-zig@v2
