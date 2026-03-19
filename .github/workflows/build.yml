@@ -43,7 +43,7 @@ jobs:
           name: linux-builds
           path: dist/
 
-  # ── macOS (Apple Silicon + cross-compile x86_64 raylib) ───
+  # ── macOS (Apple Silicon) ─────────────────────────────────
   build-macos:
     runs-on: macos-latest
     steps:
@@ -66,11 +66,6 @@ jobs:
         run: zig build -Dgui=raylib -Doptimize=ReleaseSmall
       - name: Package raylib ARM
         run: cp zig-out/bin/fin-c dist/fin-c-raylib-macos-arm64
-
-      - name: Cross-compile raylib (macOS x86_64)
-        run: zig build -Dgui=raylib -Doptimize=ReleaseSmall -Dtarget=x86_64-macos
-      - name: Package raylib x86_64
-        run: cp zig-out/bin/fin-c dist/fin-c-raylib-macos-x86_64
 
       - uses: actions/upload-artifact@v4
         with:
