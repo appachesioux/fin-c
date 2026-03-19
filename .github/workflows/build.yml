@@ -72,10 +72,41 @@ jobs:
           name: macos-builds
           path: dist/
 
+  # ── Windows: GTK nativo via MSYS2 ─────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-pkg-config
+      - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: ${{ env.ZIG_VERSION }}
+
+      - name: Build GTK (Windows x86_64)
+        run: zig build -Doptimize=ReleaseSmall
+      - name: Package GTK Windows
+        run: |
+          mkdir -p dist
+          cp zig-out/bin/fin-c.exe dist/fin-c-gtk-windows-x86_64.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-builds
+          path: dist/
+
   # ── Release ───────────────────────────────────────────────
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-linux, build-macos]
+    needs: [build-linux, build-macos, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
