@@ -48,7 +48,21 @@ jobs:
           version: ${{ env.ZIG_VERSION }}
 
       - name: Build macOS ARM64
-        run: zig build -Doptimize=ReleaseSmall
+        run: |
+          # First attempt fetches deps but fails on dead xcode-frameworks URL
+          zig build -Doptimize=ReleaseSmall 2>/dev/null || true
+          # Patch out the dead xcode-frameworks lazy dependency from cached raylib
+          ZON="$(find .zig-cache/p -path '*/raylib-5.6.0*/build.zig.zon' 2>/dev/null | head -1)"
+          if [ -n "$ZON" ]; then
+            python3 -c "
+          import re, pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          t = p.read_text()
+          t = re.sub(r'\s*\.xcode_frameworks\s*=\s*\.\{[^}]*\},', '', t)
+          p.write_text(t)
+          " "$ZON"
+          fi
+          zig build -Doptimize=ReleaseSmall
       - name: Package
         run: |
           mkdir -p dist
