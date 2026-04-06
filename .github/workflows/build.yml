@@ -47,11 +47,14 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
 
-      - name: Pre-fetch xcode-frameworks dependency
-        run: |
-          git clone https://github.com/hexops/xcode-frameworks /tmp/xcode-frameworks
-          cd /tmp/xcode-frameworks && git checkout 9a45f3ac977fd25dff77e58c6de1870b6808c4a7
-          zig fetch /tmp/xcode-frameworks
+      - uses: actions/checkout@v4
+        with:
+          repository: hexops/xcode-frameworks
+          ref: 9a45f3ac977fd25dff77e58c6de1870b6808c4a7
+          path: xcode-frameworks
+
+      - name: Pre-fetch xcode-frameworks into Zig cache
+        run: zig fetch ./xcode-frameworks
 
       - name: Build macOS ARM64
         run: zig build -Doptimize=ReleaseSmall
