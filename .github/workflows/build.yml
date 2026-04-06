@@ -47,13 +47,11 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
 
+      - name: Pre-fetch xcode-frameworks dependency
+        run: zig fetch "git+https://github.com/hexops/xcode-frameworks#9a45f3ac977fd25dff77e58c6de1870b6808c4a7"
+
       - name: Build macOS ARM64
-        run: |
-          for i in 1 2 3; do
-            zig build -Doptimize=ReleaseSmall && break
-            echo "Attempt $i failed, retrying..."
-            sleep 5
-          done
+        run: zig build -Doptimize=ReleaseSmall
       - name: Package
         run: |
           mkdir -p dist
