@@ -47,15 +47,6 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
 
-      - uses: actions/checkout@v4
-        with:
-          repository: hexops/xcode-frameworks
-          ref: 9a45f3ac977fd25dff77e58c6de1870b6808c4a7
-          path: xcode-frameworks
-
-      - name: Pre-fetch xcode-frameworks into Zig cache
-        run: zig fetch ./xcode-frameworks
-
       - name: Build macOS ARM64
         run: zig build -Doptimize=ReleaseSmall
       - name: Package
