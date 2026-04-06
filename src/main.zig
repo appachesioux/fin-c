@@ -1,7 +1,6 @@
 const std = @import("std");
-const rl = @cImport({
-    @cInclude("raylib.h");
-});
+const rl = @import("raylib");
+const gui = @import("raygui");
 const build_options = @import("build_options");
 
 const number = @import("number.zig");
@@ -12,38 +11,9 @@ const keyboard = @import("keyboard.zig");
 // Layout
 const WINDOW_W = 420;
 const WINDOW_H = 900;
-const KB_ROWS: f32 = @floatFromInt(keyboard.ROWS);
-
-// Colors — matched to GTK4 theme
-const COLOR_BG = rl.Color{ .r = 60, .g = 60, .b = 65, .a = 255 };
-const COLOR_TAPE = rl.Color{ .r = 255, .g = 251, .b = 250, .a = 255 };
-const COLOR_TAPE_TEXT = rl.Color{ .r = 30, .g = 30, .b = 30, .a = 255 };
-const COLOR_TAPE_RESULT = rl.Color{ .r = 10, .g = 10, .b = 10, .a = 255 };
-const COLOR_TAPE_OP = rl.Color{ .r = 120, .g = 120, .b = 126, .a = 255 };
-const COLOR_INPUT_BG = rl.Color{ .r = 45, .g = 45, .b = 50, .a = 255 };
-const COLOR_INPUT_TEXT = rl.Color{ .r = 220, .g = 255, .b = 220, .a = 255 };
-const COLOR_BTN = rl.Color{ .r = 85, .g = 85, .b = 90, .a = 255 };
-const COLOR_BTN_OP = rl.Color{ .r = 180, .g = 120, .b = 50, .a = 255 };
-const COLOR_BTN_EQ = rl.Color{ .r = 60, .g = 140, .b = 80, .a = 255 };
-const COLOR_BTN_TEXT = rl.Color{ .r = 240, .g = 240, .b = 240, .a = 255 };
-const COLOR_BTN_CLEAR = rl.Color{ .r = 160, .g = 60, .b = 60, .a = 255 };
-const COLOR_BTN_FN = rl.Color{ .r = 70, .g = 100, .b = 140, .a = 255 };
-
-// Font sizes — tape/input larger, buttons compact
-const TAPE_FONT: f32 = 20;
-const INPUT_FONT: f32 = 22;
-const BTN_FONT: f32 = 16;
-const LINE_HEIGHT: f32 = 28;
-const TAPE_MARGIN: f32 = 16;
-
-// Keyboard height: compact fixed size based on button minimum
-const BTN_MIN_H: f32 = 34;
-const KB_PAD: f32 = 8;
-const INPUT_H: f32 = 40;
 
 const font_data = @embedFile("JetBrainsMono-Regular.ttf");
 const icon_data = @embedFile("icon.png");
-var font: rl.Font = undefined;
 
 // Button press feedback
 var pressed_row: ?usize = null;
@@ -51,27 +21,40 @@ var pressed_col: ?usize = null;
 var press_timer: u8 = 0;
 const PRESS_FRAMES: u8 = 6;
 
+// Fonts (different sizes)
+var font_tape: rl.Font = undefined;
+var font_input: rl.Font = undefined;
+var font_btn: rl.Font = undefined;
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    rl.SetConfigFlags(rl.FLAG_WINDOW_RESIZABLE);
-    rl.InitWindow(WINDOW_W, WINDOW_H, build_options.app_name ++ "  v" ++ build_options.version);
-    defer rl.CloseWindow();
+    rl.setConfigFlags(.{ .window_resizable = true });
+    rl.initWindow(WINDOW_W, WINDOW_H, build_options.app_name ++ "  v" ++ build_options.version);
+    defer rl.closeWindow();
 
     // Window icon
-    const icon = rl.LoadImageFromMemory(".png", icon_data, @intCast(icon_data.len));
-    rl.SetWindowIcon(icon);
-    rl.UnloadImage(icon);
+    const icon = rl.loadImageFromMemory(".png", icon_data) catch unreachable;
+    rl.setWindowIcon(icon);
+    rl.unloadImage(icon);
 
-    rl.SetTargetFPS(60);
+    rl.setTargetFPS(60);
 
-    // Load font at large size for quality scaling
-    const font_size_int: c_int = @intFromFloat(INPUT_FONT * 2);
-    font = rl.LoadFontFromMemory(".ttf", font_data, @intCast(font_data.len), font_size_int, null, 0);
-    rl.SetTextureFilter(font.texture, rl.TEXTURE_FILTER_BILINEAR);
-    defer rl.UnloadFont(font);
+    // Load fonts at different sizes
+    font_tape = rl.loadFontFromMemory(".ttf", font_data, 20, null) catch unreachable;
+    font_input = rl.loadFontFromMemory(".ttf", font_data, 22, null) catch unreachable;
+    font_btn = rl.loadFontFromMemory(".ttf", font_data, 16, null) catch unreachable;
+    defer rl.unloadFont(font_tape);
+    defer rl.unloadFont(font_input);
+    defer rl.unloadFont(font_btn);
+
+    // Set raygui font and style
+    gui.setFont(font_btn);
+    gui.setStyle(.default, .{ .default = .text_size }, 16);
+    gui.setStyle(.default, .{ .default = .text_spacing }, 1);
+    gui.setStyle(.default, .{ .default = .background_color }, colorToInt(.{ .r = 60, .g = 60, .b = 65, .a = 255 }));
 
     var t = tape.Tape.init(allocator);
     defer t.deinit();
@@ -82,21 +65,12 @@ pub fn main() !void {
     var input_buf: [64]u8 = undefined;
     var input_len: usize = 0;
     var decimal_places: u8 = 2;
+    var scroll_to_bottom = false;
 
-    while (!rl.WindowShouldClose()) {
-        const win_w: f32 = @floatFromInt(rl.GetScreenWidth());
-        const win_h: f32 = @floatFromInt(rl.GetScreenHeight());
+    // Tape scroll state
+    var tape_scroll = rl.Vector2{ .x = 0, .y = 0 };
 
-        // Keyboard takes only what it needs — rest goes to tape
-        const kb_h = BTN_MIN_H * KB_ROWS + KB_PAD;
-        const tape_h = win_h - kb_h - INPUT_H;
-
-        // Scroll
-        const wheel = rl.GetMouseWheelMove();
-        if (wheel != 0) {
-            t.scroll(wheel * 30.0, tape_h);
-        }
-
+    while (!rl.windowShouldClose()) {
         // Tick press timer
         if (press_timer > 0) {
             press_timer -= 1;
@@ -106,87 +80,131 @@ pub fn main() !void {
             }
         }
 
-        // Mouse click on keyboard
-        if (rl.IsMouseButtonPressed(rl.MOUSE_BUTTON_LEFT)) {
-            const mouse = rl.GetMousePosition();
-            if (kb.handleClick(mouse.x, mouse.y, win_w, win_h, kb_h)) |action| {
-                setPressedFromAction(action, &kb);
-                processAction(action, &engine, &fin, &t, &input_buf, &input_len, decimal_places, &kb, &decimal_places);
-            }
-        }
-
+        // Physical keyboard
         // Clipboard: Ctrl+V paste, Ctrl+C copy
-        if (rl.IsKeyDown(rl.KEY_LEFT_CONTROL) or rl.IsKeyDown(rl.KEY_RIGHT_CONTROL)) {
-            if (rl.IsKeyPressed(rl.KEY_V)) {
-                const clip = rl.GetClipboardText();
-                if (clip != null) {
-                    const clip_str = std.mem.span(clip);
-                    if (clip_str.len > 0) {
-                        const len = number.Decimal.parsePaste(clip_str, &input_buf);
-                        if (len > 0) input_len = len;
-                    }
+        if (rl.isKeyDown(.left_control) or rl.isKeyDown(.right_control)) {
+            if (rl.isKeyPressed(.v)) {
+                const clip = rl.getClipboardText();
+                if (clip.len > 0) {
+                    const len = number.Decimal.parsePaste(clip, &input_buf);
+                    if (len > 0) input_len = len;
                 }
             }
-            if (rl.IsKeyPressed(rl.KEY_C)) {
+            if (rl.isKeyPressed(.c)) {
                 if (input_len > 0) {
-                    rl.SetClipboardText(toC(input_buf[0..input_len]));
+                    rl.setClipboardText(toSentinel(input_buf[0..input_len]));
                 } else if (engine.has_value) {
                     var fmt_buf: [128]u8 = undefined;
                     const formatted = engine.accumulator.format(&fmt_buf);
-                    rl.SetClipboardText(toC(formatted));
+                    rl.setClipboardText(toSentinel(formatted));
                 }
             }
         }
 
-        // Physical keyboard
         if (handlePhysicalKey()) |action| {
             setPressedFromAction(action, &kb);
+            const prev_count = t.entries.items.len;
             processAction(action, &engine, &fin, &t, &input_buf, &input_len, decimal_places, &kb, &decimal_places);
+            if (t.entries.items.len > prev_count) scroll_to_bottom = true;
         }
 
-        rl.BeginDrawing();
-        rl.ClearBackground(COLOR_BG);
+        rl.beginDrawing();
+        rl.clearBackground(.{ .r = 60, .g = 60, .b = 65, .a = 255 });
 
-        drawTapeArea(0, 0, win_w, tape_h, &t);
-        drawInputLine(0, tape_h, win_w, INPUT_H, input_buf[0..input_len]);
-        drawKeyboard(0, tape_h + INPUT_H, win_w, kb_h, &kb);
+        const win_w: f32 = @floatFromInt(rl.getScreenWidth());
+        const win_h: f32 = @floatFromInt(rl.getScreenHeight());
 
-        rl.EndDrawing();
+        // Calculate layout
+        const kb_rows: f32 = @floatFromInt(keyboard.ROWS);
+        const btn_h: f32 = 34;
+        const kb_h = btn_h * kb_rows + 12;
+        const input_h: f32 = 40;
+        const tape_h = win_h - kb_h - input_h;
+
+        drawTapeArea(win_w, tape_h, &t, &scroll_to_bottom, &tape_scroll);
+        drawInputLine(win_w, tape_h, input_h, input_buf[0..input_len]);
+        drawKeyboard(win_w, tape_h + input_h, kb_h, &kb, &engine, &fin, &t, &input_buf, &input_len, decimal_places, &decimal_places, &scroll_to_bottom);
+
+        rl.endDrawing();
     }
 }
 
-// ── Rendering ──────────────────────────────────────────────
+// ── Color Helpers ───────────────────────────────────────
 
-fn drawTapeArea(x: f32, y: f32, w: f32, h: f32, t: *tape.Tape) void {
-    // Tape paper background with rounded top corners
-    rl.DrawRectangleRounded(.{ .x = x + 8, .y = y + 8, .width = w - 16, .height = h - 8 }, 0.02, 4, COLOR_TAPE);
+fn colorToInt(c: rl.Color) i32 {
+    return @as(i32, @bitCast(@as(u32, c.r) | (@as(u32, c.g) << 8) | (@as(u32, c.b) << 16) | (@as(u32, c.a) << 24)));
+}
 
-    rl.BeginScissorMode(
-        @intFromFloat(x + 8),
-        @intFromFloat(y + 8),
-        @intFromFloat(w - 16),
-        @intFromFloat(h - 8),
-    );
+fn brighten(c: rl.Color, amount: u8) rl.Color {
+    return .{
+        .r = c.r +| amount,
+        .g = c.g +| amount,
+        .b = c.b +| amount,
+        .a = c.a,
+    };
+}
 
+fn darken(c: rl.Color, amount: u8) rl.Color {
+    return .{
+        .r = c.r -| amount,
+        .g = c.g -| amount,
+        .b = c.b -| amount,
+        .a = c.a,
+    };
+}
+
+// ── Tape Area ───────────────────────────────────────────
+
+fn drawTapeArea(win_w: f32, tape_h: f32, t: *tape.Tape, scroll_to_bottom: *bool, tape_scroll: *rl.Vector2) void {
+    const tape_rect = rl.Rectangle{ .x = 0, .y = 0, .width = win_w, .height = tape_h };
+
+    // Paper background
+    rl.drawRectangleRec(tape_rect, .{ .r = 255, .g = 251, .b = 250, .a = 255 });
+
+    // Calculate content height
+    const line_h: f32 = 24;
+    const padding: f32 = 8;
     const entries = t.entries.items;
-    if (entries.len > 0) {
-        var draw_y = y + h - LINE_HEIGHT - 8 + t.scroll_offset;
+    var content_h: f32 = padding;
+    for (entries) |entry| {
+        content_h += line_h;
+        if (entry.is_result) content_h += 2; // separator
+    }
+    content_h += padding;
 
-        var i: usize = entries.len;
-        while (i > 0) {
-            i -= 1;
-            if (draw_y < y - LINE_HEIGHT) break;
-            if (draw_y > y + h) {
-                draw_y -= LINE_HEIGHT;
-                continue;
-            }
+    // Auto-scroll to bottom when new entry added
+    if (scroll_to_bottom.*) {
+        const max_scroll = @max(content_h - tape_h, 0);
+        tape_scroll.y = -max_scroll;
+        scroll_to_bottom.* = false;
+    }
 
-            const entry = entries[i];
+    // Mouse wheel scroll (only when mouse is in tape area)
+    const mouse_pos = rl.getMousePosition();
+    if (rl.checkCollisionPointRec(mouse_pos, tape_rect)) {
+        const wheel = rl.getMouseWheelMove();
+        if (wheel != 0) {
+            tape_scroll.y += wheel * 30;
+            // Clamp scroll
+            const max_scroll = @max(content_h - tape_h, 0);
+            tape_scroll.y = @min(tape_scroll.y, 0);
+            tape_scroll.y = @max(tape_scroll.y, -max_scroll);
+        }
+    }
+
+    // Clip to tape area
+    rl.beginScissorMode(@intFromFloat(0), @intFromFloat(0), @intFromFloat(win_w), @intFromFloat(tape_h));
+
+    // Draw entries — aligned to bottom (paper tape grows upward)
+    const start_y = if (content_h < tape_h) tape_h - content_h else 0;
+    var y: f32 = start_y + padding + tape_scroll.y;
+    for (entries) |entry| {
+        if (y + line_h >= -line_h and y <= tape_h + line_h) {
             var fmt_buf: [128]u8 = undefined;
             const val_str = entry.value.format(&fmt_buf);
 
-            const tag_str: [*c]const u8 = if (entry.label) |lbl|
-                toC(lbl)
+            const tag_str: []const u8 = if (entry.label) |lbl|
+                lbl
             else if (entry.operator) |op| switch (op) {
                 .add => "+",
                 .sub => "-",
@@ -195,137 +213,146 @@ fn drawTapeArea(x: f32, y: f32, w: f32, h: f32, t: *tape.Tape) void {
                 .equals => "=",
             } else " ";
 
-            const tag_width = measureText(tag_str, TAPE_FONT);
-            const val_width = measureText(toC(val_str), TAPE_FONT);
-            const op_right_x = x + w - TAPE_MARGIN - 16;
-            const val_x = op_right_x - tag_width - 8 - val_width;
+            // Measure text
+            const val_size = rl.measureTextEx(font_tape, toSentinel(val_str), 20, 1);
+            const tag_size = rl.measureTextEx(font_tape, toSentinel(tag_str), 20, 1);
 
-            // Results rendered bolder (darker color)
-            const val_color = if (entry.is_result) COLOR_TAPE_RESULT else COLOR_TAPE_TEXT;
+            // Right-align: value + gap + tag
+            const val_x = win_w - 16 - tag_size.x - 8 - val_size.x;
 
-            drawText(toC(val_str), val_x, draw_y, TAPE_FONT, val_color);
-            drawText(tag_str, op_right_x - tag_width, draw_y, TAPE_FONT, COLOR_TAPE_OP);
+            const val_color: rl.Color = if (entry.is_result) .{ .r = 10, .g = 10, .b = 10, .a = 255 } else .{ .r = 30, .g = 30, .b = 30, .a = 255 };
+            rl.drawTextEx(font_tape, toSentinel(val_str), .{ .x = val_x, .y = y }, 20, 1, val_color);
+            rl.drawTextEx(font_tape, toSentinel(tag_str), .{ .x = win_w - 16 - tag_size.x, .y = y }, 20, 1, .{ .r = 120, .g = 120, .b = 126, .a = 255 });
 
             if (entry.is_result) {
-                rl.DrawLineEx(
-                    .{ .x = x + TAPE_MARGIN + 8, .y = draw_y + TAPE_FONT + 2 },
-                    .{ .x = x + w - TAPE_MARGIN - 16, .y = draw_y + TAPE_FONT + 2 },
-                    1.0,
-                    COLOR_TAPE_TEXT,
-                );
+                rl.drawLine(@intFromFloat(8), @intFromFloat(y + line_h - 2), @intFromFloat(win_w - 8), @intFromFloat(y + line_h - 2), .{ .r = 200, .g = 200, .b = 200, .a = 255 });
             }
-
-            draw_y -= LINE_HEIGHT;
         }
+        y += line_h;
+        if (entry.is_result) y += 2;
     }
 
-    rl.EndScissorMode();
+    rl.endScissorMode();
 
-    // Top shadow for paper effect
-    rl.DrawRectangleGradientV(
-        @intFromFloat(x + 8),
-        @intFromFloat(y + 8),
-        @intFromFloat(w - 16),
-        20,
-        rl.Color{ .r = 200, .g = 200, .b = 195, .a = 100 },
-        rl.Color{ .r = 255, .g = 251, .b = 250, .a = 0 },
-    );
-}
+    // Shadow gradient at top (draw over content)
+    const shadow_h: i32 = 20;
+    var si: i32 = 0;
+    while (si < shadow_h) : (si += 1) {
+        const alpha: u8 = @intFromFloat(100.0 * (1.0 - @as(f32, @floatFromInt(si)) / @as(f32, @floatFromInt(shadow_h))));
+        rl.drawLine(0, si, @intFromFloat(win_w), si, .{ .r = 200, .g = 200, .b = 195, .a = alpha });
+    }
 
-fn drawInputLine(x: f32, y: f32, w: f32, h: f32, text: []const u8) void {
-    rl.DrawRectangleRec(.{ .x = x + 8, .y = y, .width = w - 16, .height = h }, COLOR_INPUT_BG);
-
-    if (text.len > 0) {
-        const tw = measureText(toC(text), INPUT_FONT);
-        const tx = x + w - TAPE_MARGIN - 24 - tw;
-        drawText(toC(text), tx, y + (h - INPUT_FONT) / 2, INPUT_FONT, COLOR_INPUT_TEXT);
-    } else {
-        const tw = measureText("0", INPUT_FONT);
-        const tx = x + w - TAPE_MARGIN - 24 - tw;
-        drawText("0", tx, y + (h - INPUT_FONT) / 2, INPUT_FONT, rl.Color{ .r = 120, .g = 160, .b = 120, .a = 255 });
+    // Scrollbar indicator (simple)
+    if (content_h > tape_h) {
+        const bar_h = @max(tape_h * tape_h / content_h, 20);
+        const max_scroll = content_h - tape_h;
+        const scroll_ratio = if (max_scroll > 0) -tape_scroll.y / max_scroll else 0;
+        const bar_y = scroll_ratio * (tape_h - bar_h);
+        rl.drawRectangleRounded(.{ .x = win_w - 6, .y = bar_y, .width = 4, .height = bar_h }, 1.0, 4, .{ .r = 160, .g = 160, .b = 165, .a = 150 });
     }
 }
 
-fn drawKeyboard(x: f32, y: f32, w: f32, h: f32, kb: *const keyboard.Keyboard) void {
-    const btn_h = (h - KB_PAD) / KB_ROWS;
-    const mouse = rl.GetMousePosition();
-    const pressed = rl.IsMouseButtonDown(rl.MOUSE_BUTTON_LEFT);
+// ── Input Line ──────────────────────────────────────────
+
+fn drawInputLine(win_w: f32, y: f32, h: f32, text: []const u8) void {
+    // Background
+    rl.drawRectangleRec(.{ .x = 0, .y = y, .width = win_w, .height = h }, .{ .r = 45, .g = 45, .b = 50, .a = 255 });
+
+    const display_text: []const u8 = if (text.len > 0) text else "0";
+    const text_color: rl.Color = if (text.len > 0) .{ .r = 220, .g = 255, .b = 220, .a = 255 } else .{ .r = 120, .g = 160, .b = 120, .a = 255 };
+
+    const text_size = rl.measureTextEx(font_input, toSentinel(display_text), 22, 1);
+    const text_x = win_w - text_size.x - 12;
+    const text_y = y + (h - text_size.y) / 2.0;
+    rl.drawTextEx(font_input, toSentinel(display_text), .{ .x = text_x, .y = text_y }, 22, 1, text_color);
+}
+
+// ── Keyboard ────────────────────────────────────────────
+
+fn drawKeyboard(
+    win_w: f32,
+    y: f32,
+    h: f32,
+    kb: *keyboard.Keyboard,
+    engine: *calc.CalcEngine,
+    fin: *calc.FinRegisters,
+    t: *tape.Tape,
+    input_buf: *[64]u8,
+    input_len: *usize,
+    decimal_places: u8,
+    dp_ptr: *u8,
+    scroll_to_bottom: *bool,
+) void {
+    const cols: f32 = @floatFromInt(keyboard.COLS);
+    const rows: f32 = @floatFromInt(keyboard.ROWS);
+    const gap: f32 = 4;
+    const pad: f32 = 6;
+    const btn_w = (win_w - pad * 2 - (cols - 1) * gap) / cols;
+    const btn_h = (h - pad * 2 - (rows - 1) * gap) / rows;
 
     for (0..keyboard.ROWS) |ri| {
-        const cols: f32 = @floatFromInt(keyboard.COLS);
-        const btn_w = (w - 16) / cols;
-
         for (0..keyboard.COLS) |ci| {
             const btn = kb.getBtn(ri, ci);
-            const bx = x + 8 + @as(f32, @floatFromInt(ci)) * btn_w + 2;
-            const by = y + 4 + @as(f32, @floatFromInt(ri)) * btn_h + 1;
-            const bw = btn_w - 4;
-            const bh = btn_h - 2;
+            const is_pressed = (pressed_row == ri and pressed_col == ci);
 
-            const rect = rl.Rectangle{ .x = bx, .y = by, .width = bw, .height = bh };
-            const hovered = rl.CheckCollisionPointRec(mouse, rect);
+            const bx = pad + @as(f32, @floatFromInt(ci)) * (btn_w + gap);
+            const by = y + pad + @as(f32, @floatFromInt(ri)) * (btn_h + gap);
+            const rect = rl.Rectangle{ .x = bx, .y = by, .width = btn_w, .height = btn_h };
 
-            const base_color = btnColor(btn.style);
-            const is_pressed = (pressed_row == ri and pressed_col == ci) or (hovered and pressed);
-            const color = if (is_pressed) darken(base_color) else if (hovered) brighten(base_color) else base_color;
+            // Button colors based on style
+            const base = btnStyleColor(btn.style);
+            const mouse_pos = rl.getMousePosition();
+            const hovered = rl.checkCollisionPointRec(mouse_pos, rect);
 
-            rl.DrawRectangleRounded(rect, 0.2, 4, color);
+            const color = if (is_pressed)
+                darken(base, 40)
+            else if (hovered)
+                brighten(base, 20)
+            else
+                base;
 
-            const label = btn.label;
-            const tw = measureText(toC(label), BTN_FONT);
-            const tx = bx + (bw - tw) / 2;
-            const ty = by + (bh - BTN_FONT) / 2;
-            drawText(toC(label), tx, ty, BTN_FONT, COLOR_BTN_TEXT);
+            // Draw button
+            rl.drawRectangleRounded(rect, 0.3, 4, color);
+
+            // Button text (centered)
+            const label_str = toSentinel(btn.label);
+            const text_size = rl.measureTextEx(font_btn, label_str, 16, 1);
+            const tx = bx + (btn_w - text_size.x) / 2.0;
+            const ty = by + (btn_h - text_size.y) / 2.0;
+            rl.drawTextEx(font_btn, label_str, .{ .x = tx, .y = ty }, 16, 1, .{ .r = 240, .g = 240, .b = 240, .a = 255 });
+
+            // Click detection
+            if (hovered and rl.isMouseButtonPressed(.left)) {
+                setPressedFromAction(btn.action, kb);
+                const prev_count = t.entries.items.len;
+                processAction(btn.action, engine, fin, t, input_buf, input_len, decimal_places, kb, dp_ptr);
+                if (t.entries.items.len > prev_count) scroll_to_bottom.* = true;
+            }
         }
     }
 }
 
-fn btnColor(style: keyboard.BtnStyle) rl.Color {
+fn btnStyleColor(style: keyboard.BtnStyle) rl.Color {
     return switch (style) {
-        .normal => COLOR_BTN,
-        .operator => COLOR_BTN_OP,
-        .equals => COLOR_BTN_EQ,
-        .clear => COLOR_BTN_CLEAR,
-        .function => COLOR_BTN_FN,
+        .normal => .{ .r = 85, .g = 85, .b = 90, .a = 255 },
+        .operator => .{ .r = 180, .g = 120, .b = 50, .a = 255 },
+        .equals => .{ .r = 60, .g = 140, .b = 80, .a = 255 },
+        .clear => .{ .r = 160, .g = 60, .b = 60, .a = 255 },
+        .function => .{ .r = 70, .g = 100, .b = 140, .a = 255 },
     };
 }
 
-fn brighten(c: rl.Color) rl.Color {
-    return .{
-        .r = @min(255, c.r + 20),
-        .g = @min(255, c.g + 20),
-        .b = @min(255, c.b + 20),
-        .a = c.a,
-    };
-}
+// ── Helpers ─────────────────────────────────────────────
 
-fn darken(c: rl.Color) rl.Color {
-    return .{
-        .r = c.r -| 40,
-        .g = c.g -| 40,
-        .b = c.b -| 40,
-        .a = c.a,
-    };
-}
-
-/// Convert a Zig slice to a C string pointer (using rotating static buffers).
 var c_str_bufs: [4][256]u8 = undefined;
 var c_str_idx: usize = 0;
-fn toC(text: []const u8) [*c]const u8 {
+fn toSentinel(text: []const u8) [:0]const u8 {
     const idx = c_str_idx;
     c_str_idx = (c_str_idx + 1) % 4;
     const len = @min(text.len, c_str_bufs[idx].len - 1);
     @memcpy(c_str_bufs[idx][0..len], text[0..len]);
     c_str_bufs[idx][len] = 0;
-    return &c_str_bufs[idx];
-}
-
-fn drawText(text: [*c]const u8, x: f32, y: f32, size: f32, color: rl.Color) void {
-    rl.DrawTextEx(font, text, .{ .x = x, .y = y }, size, 1, color);
-}
-
-fn measureText(text: [*c]const u8, size: f32) f32 {
-    return rl.MeasureTextEx(font, text, size, 1).x;
+    return c_str_bufs[idx][0..len :0];
 }
 
 fn setPressedFromAction(action: keyboard.Action, kb: *const keyboard.Keyboard) void {
@@ -341,7 +368,7 @@ fn setPressedFromAction(action: keyboard.Action, kb: *const keyboard.Keyboard) v
     }
 }
 
-// ── Input Processing ───────────────────────────────────────
+// ── Input Processing ────────────────────────────────────
 
 fn processAction(
     action: keyboard.Action,
@@ -447,13 +474,11 @@ fn processAction(
             };
 
             if (input_len.* > 0) {
-                // Store value in register
                 const val = number.Decimal.parse(input_buf[0..input_len.*], decimal_places);
                 fin.set(reg, val.toF64());
                 t.addEntry(.{ .value = val, .operator = null, .is_result = false, .label = reg_label });
                 input_len.* = 0;
             } else {
-                // Try to solve
                 if (fin.solve()) |result| {
                     const result_label: []const u8 = switch (result.reg) {
                         .pv => "PV",
@@ -470,8 +495,6 @@ fn processAction(
             }
         },
         .fin_markup => {
-            // Markup: need cost in input, margin in accumulator (or vice versa)
-            // Use: cost in accumulator, margin in input
             if (input_len.* > 0 and engine.has_value) {
                 const margin_dec = number.Decimal.parse(input_buf[0..input_len.*], decimal_places);
                 const margin = margin_dec.toF64();
@@ -489,29 +512,29 @@ fn processAction(
 }
 
 fn handlePhysicalKey() ?keyboard.Action {
-    const key = rl.GetKeyPressed();
-    if (key == 0) return null;
+    const key = rl.getKeyPressed();
+    if (key == .null) return null;
 
     return switch (key) {
-        rl.KEY_ZERO, rl.KEY_KP_0 => .{ .digit = '0' },
-        rl.KEY_ONE, rl.KEY_KP_1 => .{ .digit = '1' },
-        rl.KEY_TWO, rl.KEY_KP_2 => .{ .digit = '2' },
-        rl.KEY_THREE, rl.KEY_KP_3 => .{ .digit = '3' },
-        rl.KEY_FOUR, rl.KEY_KP_4 => .{ .digit = '4' },
-        rl.KEY_FIVE, rl.KEY_KP_5 => .{ .digit = '5' },
-        rl.KEY_SIX, rl.KEY_KP_6 => .{ .digit = '6' },
-        rl.KEY_SEVEN, rl.KEY_KP_7 => .{ .digit = '7' },
-        rl.KEY_EIGHT, rl.KEY_KP_8 => .{ .digit = '8' },
-        rl.KEY_NINE, rl.KEY_KP_9 => .{ .digit = '9' },
-        rl.KEY_PERIOD, rl.KEY_KP_DECIMAL => .dot,
-        rl.KEY_KP_ADD => .{ .operator = .add },
-        rl.KEY_KP_SUBTRACT, rl.KEY_MINUS => .{ .operator = .sub },
-        rl.KEY_KP_MULTIPLY => .{ .operator = .mul },
-        rl.KEY_KP_DIVIDE, rl.KEY_SLASH => .{ .operator = .div },
-        rl.KEY_ENTER, rl.KEY_KP_ENTER, rl.KEY_EQUAL => .equals,
-        rl.KEY_BACKSPACE => .backspace,
-        rl.KEY_ESCAPE => .clear,
-        rl.KEY_DELETE => .clear_entry,
+        .zero, .kp_0 => .{ .digit = '0' },
+        .one, .kp_1 => .{ .digit = '1' },
+        .two, .kp_2 => .{ .digit = '2' },
+        .three, .kp_3 => .{ .digit = '3' },
+        .four, .kp_4 => .{ .digit = '4' },
+        .five, .kp_5 => .{ .digit = '5' },
+        .six, .kp_6 => .{ .digit = '6' },
+        .seven, .kp_7 => .{ .digit = '7' },
+        .eight, .kp_8 => .{ .digit = '8' },
+        .nine, .kp_9 => .{ .digit = '9' },
+        .period, .kp_decimal => .dot,
+        .kp_add => .{ .operator = .add },
+        .kp_subtract, .minus => .{ .operator = .sub },
+        .kp_multiply => .{ .operator = .mul },
+        .kp_divide, .slash => .{ .operator = .div },
+        .enter, .kp_enter, .equal => .equals,
+        .backspace => .backspace,
+        .escape => .clear,
+        .delete => .clear_entry,
         else => null,
     };
 }

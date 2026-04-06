@@ -5,39 +5,37 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const gui = b.option([]const u8, "gui", "Frontend: \"gtk\" (default) or \"raylib\"") orelse "gtk";
-    const use_gtk = std.mem.eql(u8, gui, "gtk");
-
     const options = b.addOptions();
     options.addOption([]const u8, "version", zon.version);
     options.addOption([]const u8, "app_name", "fin-c");
 
-    const root_source = if (use_gtk) b.path("src/main_gtk.zig") else b.path("src/main.zig");
+    // raylib-zig dependency
+    const raylib_dep = b.dependency("raylib_zig", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const raylib_artifact = raylib_dep.artifact("raylib");
+
+    // Zig modules
+    const raylib_module = raylib_dep.module("raylib");
+    const raygui_module = raylib_dep.module("raygui");
 
     const exe = b.addExecutable(.{
         .name = "fin-c",
         .root_module = b.createModule(.{
-            .root_source_file = root_source,
+            .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "build_options", .module = options.createModule() },
+                .{ .name = "raylib", .module = raylib_module },
+                .{ .name = "raygui", .module = raygui_module },
             },
         }),
     });
 
     exe.linkLibC();
-
-    if (use_gtk) {
-        exe.linkSystemLibrary("gtk4");
-    } else {
-        const raylib_dep = b.dependency("raylib_zig", .{
-            .target = target,
-            .optimize = optimize,
-        });
-        const raylib_artifact = raylib_dep.artifact("raylib");
-        exe.root_module.linkLibrary(raylib_artifact);
-    }
+    exe.root_module.linkLibrary(raylib_artifact);
 
     b.installArtifact(exe);
 
