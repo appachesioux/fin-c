@@ -47,22 +47,35 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
 
-      - name: Build macOS ARM64
+      - name: Fetch and patch raylib (hexops/xcode-frameworks repo is dead)
         run: |
           # First attempt fetches deps but fails on dead xcode-frameworks URL
           zig build -Doptimize=ReleaseSmall 2>/dev/null || true
-          # Patch out the dead xcode-frameworks lazy dependency from cached raylib
-          ZON="$(find .zig-cache/p -path '*/raylib-5.6.0*/build.zig.zon' 2>/dev/null | head -1)"
-          if [ -n "$ZON" ]; then
+          # Find cached raylib directory
+          RAYLIB_DIR="$(find .zig-cache/p -maxdepth 1 -name 'raylib-5.6.0*' -type d 2>/dev/null | head -1)"
+          if [ -n "$RAYLIB_DIR" ]; then
+            # Remove xcode_frameworks from build.zig.zon
             python3 -c "
           import re, pathlib, sys
-          p = pathlib.Path(sys.argv[1])
-          t = p.read_text()
+          d = pathlib.Path(sys.argv[1])
+          # Patch build.zig.zon - remove xcode_frameworks dependency
+          zon = d / 'build.zig.zon'
+          t = zon.read_text()
           t = re.sub(r'\s*\.xcode_frameworks\s*=\s*\.\{[^}]*\},', '', t)
-          p.write_text(t)
-          " "$ZON"
+          zon.write_text(t)
+          # Patch build.zig - remove xcode_frameworks block
+          bzig = d / 'build.zig'
+          t = bzig.read_text()
+          t = re.sub(
+            r'// Include xcode_frameworks.*?if \(b\.lazyDependency\(\"xcode_frameworks\".*?\n.*?\n.*?\n.*?\}',
+            '// xcode_frameworks removed (repo dead)',
+            t, flags=re.DOTALL)
+          bzig.write_text(t)
+          " "$RAYLIB_DIR"
           fi
-          zig build -Doptimize=ReleaseSmall
+
+      - name: Build macOS ARM64
+        run: zig build -Doptimize=ReleaseSmall
       - name: Package
         run: |
           mkdir -p dist
