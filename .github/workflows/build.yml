@@ -49,7 +49,7 @@ jobs:
 
       - name: Pre-fetch xcode-frameworks dependency
         run: |
-          git clone --depth 1 https://github.com/hexops/xcode-frameworks /tmp/xcode-frameworks
+          git clone https://github.com/hexops/xcode-frameworks /tmp/xcode-frameworks
           cd /tmp/xcode-frameworks && git checkout 9a45f3ac977fd25dff77e58c6de1870b6808c4a7
           zig fetch /tmp/xcode-frameworks
 
