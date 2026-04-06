@@ -47,15 +47,13 @@ jobs:
         with:
           version: ${{ env.ZIG_VERSION }}
 
-      - name: Fetch Zig dependencies
-        run: zig build --fetch
-        env:
-          GIT_CONFIG_COUNT: 1
-          GIT_CONFIG_KEY_0: url.https://github.com/.insteadOf
-          GIT_CONFIG_VALUE_0: git+https://github.com/
-
       - name: Build macOS ARM64
-        run: zig build -Doptimize=ReleaseSmall
+        run: |
+          for i in 1 2 3; do
+            zig build -Doptimize=ReleaseSmall && break
+            echo "Attempt $i failed, retrying..."
+            sleep 5
+          done
       - name: Package
         run: |
           mkdir -p dist
