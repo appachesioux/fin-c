@@ -125,6 +125,9 @@ pub fn main() !void {
         drawInputLine(win_w, tape_h, input_h, input_buf[0..input_len]);
         drawKeyboard(win_w, tape_h + input_h, kb_h, &kb, &engine, &fin, &t, &input_buf, &input_len, decimal_places, &decimal_places, &scroll_to_bottom);
 
+        // Subtle border around tape area (drawn last so nothing covers it)
+        rl.drawRectangleLinesEx(.{ .x = 0, .y = 0, .width = win_w, .height = tape_h }, 1, .{ .r = 100, .g = 100, .b = 95, .a = 200 });
+
         rl.endDrawing();
     }
 }
@@ -250,6 +253,7 @@ fn drawTapeArea(win_w: f32, tape_h: f32, t: *tape.Tape, scroll_to_bottom: *bool,
         const bar_y = scroll_ratio * (tape_h - bar_h);
         rl.drawRectangleRounded(.{ .x = win_w - 6, .y = bar_y, .width = 4, .height = bar_h }, 1.0, 4, .{ .r = 160, .g = 160, .b = 165, .a = 150 });
     }
+
 }
 
 // ── Input Line ──────────────────────────────────────────
