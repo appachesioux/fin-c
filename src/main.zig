@@ -27,7 +27,7 @@ var font_input: rl.Font = undefined;
 var font_btn: rl.Font = undefined;
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -118,11 +118,34 @@ pub fn main() !void {
         const kb_rows: f32 = @floatFromInt(keyboard.ROWS);
         const btn_h: f32 = 34;
         const kb_h = btn_h * kb_rows + 12;
-        const input_h: f32 = 40;
+        const input_h: f32 = 58;
         const tape_h = win_h - kb_h - input_h;
 
+        // Build partial-result preview (e.g. "350 +")
+        var preview_buf: [160]u8 = undefined;
+        var acc_fmt_buf: [128]u8 = undefined;
+        const preview_slice: []const u8 = blk: {
+            if (engine.has_value) {
+                if (engine.pending_op) |op| {
+                    if (op != .equals) {
+                        const acc_str = engine.accumulator.format(&acc_fmt_buf);
+                        const sym: []const u8 = switch (op) {
+                            .add => "+",
+                            .sub => "-",
+                            .mul => "x",
+                            .div => "/",
+                            .equals => "=",
+                        };
+                        const w = std.fmt.bufPrint(&preview_buf, "{s} {s}", .{ acc_str, sym }) catch break :blk &.{};
+                        break :blk w;
+                    }
+                }
+            }
+            break :blk &.{};
+        };
+
         drawTapeArea(win_w, tape_h, &t, &scroll_to_bottom, &tape_scroll);
-        drawInputLine(win_w, tape_h, input_h, input_buf[0..input_len]);
+        drawInputLine(win_w, tape_h, input_h, input_buf[0..input_len], preview_slice);
         drawKeyboard(win_w, tape_h + input_h, kb_h, &kb, &engine, &fin, &t, &input_buf, &input_len, decimal_places, &decimal_places, &scroll_to_bottom);
 
         // Subtle border around tape area (drawn last so nothing covers it)
@@ -258,16 +281,24 @@ fn drawTapeArea(win_w: f32, tape_h: f32, t: *tape.Tape, scroll_to_bottom: *bool,
 
 // ── Input Line ──────────────────────────────────────────
 
-fn drawInputLine(win_w: f32, y: f32, h: f32, text: []const u8) void {
+fn drawInputLine(win_w: f32, y: f32, h: f32, text: []const u8, preview: []const u8) void {
     // Background
     rl.drawRectangleRec(.{ .x = 0, .y = y, .width = win_w, .height = h }, .{ .r = 45, .g = 45, .b = 50, .a = 255 });
+
+    // Partial-result preview (top, smaller, dimmer)
+    if (preview.len > 0) {
+        const psize = rl.measureTextEx(font_btn, toSentinel(preview), 16, 1);
+        const px = win_w - psize.x - 12;
+        const py = y + 4;
+        rl.drawTextEx(font_btn, toSentinel(preview), .{ .x = px, .y = py }, 16, 1, .{ .r = 140, .g = 170, .b = 140, .a = 255 });
+    }
 
     const display_text: []const u8 = if (text.len > 0) text else "0";
     const text_color: rl.Color = if (text.len > 0) .{ .r = 220, .g = 255, .b = 220, .a = 255 } else .{ .r = 120, .g = 160, .b = 120, .a = 255 };
 
     const text_size = rl.measureTextEx(font_input, toSentinel(display_text), 22, 1);
     const text_x = win_w - text_size.x - 12;
-    const text_y = y + (h - text_size.y) / 2.0;
+    const text_y = y + h - text_size.y - 6;
     rl.drawTextEx(font_input, toSentinel(display_text), .{ .x = text_x, .y = text_y }, 22, 1, text_color);
 }
 

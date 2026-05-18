@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) void {
     const raylib_dep = b.dependency("raylib_zig", .{
         .target = target,
         .optimize = optimize,
+        .linux_display_backend = .Both,
     });
     const raylib_artifact = raylib_dep.artifact("raylib");
 
@@ -26,6 +27,7 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "build_options", .module = options.createModule() },
                 .{ .name = "raylib", .module = raylib_module },
@@ -34,7 +36,6 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    exe.linkLibC();
     exe.root_module.linkLibrary(raylib_artifact);
 
     b.installArtifact(exe);

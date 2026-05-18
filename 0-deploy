@@ -4,7 +4,9 @@ clear;
 echo "[#######] INI --------------------------------------------------------------------";
 
 pwd;
+rm -rvf .zig-cache;
 rm -rvf zig-out;
+
 zig build -Doptimize=ReleaseSmall;
 
 echo

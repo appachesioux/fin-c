@@ -16,7 +16,7 @@ pub const Tape = struct {
 
     pub fn init(allocator: std.mem.Allocator) Tape {
         return .{
-            .entries = .{},
+            .entries = .empty,
             .allocator = allocator,
             .scroll_offset = 0,
         };
